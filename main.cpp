@@ -41,7 +41,7 @@ int main() {
 		(pp.d >= 0) ? cout << "z + " : cout << "z "; cout << pp.d << endl;
 	}
 
-
+	GetDetectorHitData(0b01010101, 10.0);
 
 
 	//std::cout << res.x << " " << res.y << endl;

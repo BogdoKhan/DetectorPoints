@@ -9,6 +9,7 @@
 #include "Detector.h"
 #include "Tangents.h"
 
+void ShowDetArrayData(std::vector<Detector>& detArray);
 
 //(x-x1)^2 + (y-y1)^2 == R1^2;
 //dx + fy + e = 0
@@ -62,7 +63,10 @@ pt tangentCrd(double _x1, double _y1, double _r1,
 	return result;
 }
 
-
+//create equation of plane tangent to 1 cylinder in
+//a pre-defined tangence point based on 
+//lines tangent to cross-sectional circles
+//this plane is tangent to 2 cylinders
 plane TangPlaneToCylinder(pt3d tangPoint, cylinder c1) {
 	double coefX = 2 * (tangPoint.x - c1.x);
 	double coefY = 2 * (tangPoint.y - c1.y);
@@ -72,15 +76,21 @@ plane TangPlaneToCylinder(pt3d tangPoint, cylinder c1) {
 	plane tangPlane = plane(coefX, coefY, coefZ, coefD);
 	return tangPlane;
 }
-
+//coordinates of intersection point between the plane parallel to XY
+//and tangent line built on 2 intersecting planes
 pt3d HitPointOnDefinedPlane(plane& pl1, plane& pl2, double& z_plane) {
 	pt3d pt{ 0.0,0.0,0.0 };
 	return pt;
 }
 
+double SetIsochroneRadius(double& isoRadius, const double& tubeRadius) {
+	if (isnan(isoRadius) || isoRadius >= tubeRadius || isoRadius <= 0) return tubeRadius;
+	return isoRadius;
+}
 
 //0b|y22|y21|y12|y11|'|x22|x21|x12|x11|
-void GetDetectorHitData(const uint8_t& word ) {
+//here we create the grid for our detectors field
+void GetDetectorHitData(const uint8_t& word, const double& tubeRadius ) {
 	std::vector<std::string> DetectorNames = {
 		"X11", "X12", "X21", "X22", "Y11", "Y12", "Y21", "Y22"
 	};
@@ -91,12 +101,50 @@ void GetDetectorHitData(const uint8_t& word ) {
 	for (size_t i = 0b0000'0001, j = 0; i <= 0b1000'0000; i <<= 0b0000'0001, j++) {
 		std::cout << (std::bitset<8>)word << " "
 			<< (std::bitset<8>)i << " " << ((std::bitset<8>)(word & i)).any() << " " << DetectorNames.at(j) << std::endl;
-		Detector det(DetectorNames.at(j), ((std::bitset<8>)(word & i)).any(), 5.32);
+
+		Detector det(DetectorNames.at(j), ((std::bitset<8>)(word & i)).any()); //create detector: its emplacement(X,Y); was it hit? (counts 1s in binary corresp to its mask);
 		det._isoCylinder = cylinder();
-		if (DetectorNames.at(j).at(0) == 'X') det._isoCylinder.orientation = posPlane::XZ;
-		else if (DetectorNames.at(j).at(0) == 'Y') det._isoCylinder.orientation = posPlane::YZ;
+
+		if (DetectorNames.at(j).at(0) == 'X') {
+			det._isoCylinder.orientation = posPlane::XZ;
+
+			det._isoCylinder.x = j / 2 * tubeRadius + j % 2 * 2 * tubeRadius;
+			//j = 0, 1, 2, 3, 4, 5, 6, 7
+			//x = 0 +0 = 0 || 0 + 1*2 = 2 || 1 + 0 = 1 || 1 + 2 = 3...
+			det._isoCylinder.z = j / 2 * tubeRadius;
+			if (j / 2 < 1) det._isoCylinder.z;
+			else det._isoCylinder.z;
+
+			det._isoCylinder.y = 0.0;
+			det._isoCylinder.r = SetIsochroneRadius(isochrones.at(j), tubeRadius);
+		}
+
+		else if (DetectorNames.at(j).at(0) == 'Y') {
+			det._isoCylinder.orientation = posPlane::YZ;
+
+			det._isoCylinder.x = 0.0;
+			det._isoCylinder.y = (j - 4) / 2 * tubeRadius + (j - 4) % 2 * 2 * tubeRadius;
+			det._isoCylinder.z = j / 2 * tubeRadius;
+			det._isoCylinder.r = SetIsochroneRadius(isochrones.at(j), tubeRadius);
+		}
 		else det._isoCylinder.orientation = posPlane::NA;
+
 		detArray.push_back(det);
 	}
+	ShowDetArrayData(detArray);
+}
 
+void ShowDetArrayData(std::vector<Detector>& detArray) {
+	int counter = 0;
+	for (const auto& item : detArray) {
+		std::cout << "Detector placed at ";
+		if (item._isoCylinder.orientation == posPlane::XZ) { std::cout << "XZ plane "; }
+		else if (item._isoCylinder.orientation == posPlane::YZ) { std::cout << "YZ plane "; }
+		else { std::cout << "nowhere "; }
+		std::cout << "at X= " << item._isoCylinder.x << " Y= " << item._isoCylinder.y << " Z= " << item._isoCylinder.z;
+		std::cout << " with r = " << item._isoCylinder.r;
+		if (item.isHit()) { std::cout << ", hit"; }
+		else std::cout << ", no hit";
+		std::cout << "\n";
+	}
 }

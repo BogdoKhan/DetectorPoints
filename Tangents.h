@@ -10,28 +10,28 @@ enum class posPlane {
 //tangent to two circles and corresponding structures
 //equation is taken from https://e-maxx.ru/algo/circle_tangents
 struct pt {
-	double crd1, crd2;
-
+	double crd1, crd2; //coordinate 1 & coordinate 2, not X, Y, etc
+						//common names because in XZ and YZ cases coords are different
 	pt operator- (pt p) {
 		pt res = { crd1 - p.crd1, crd2 - p.crd2 };
 		return res;
 	}
 };
-
+//a circle, has radius r and central point at crd1, crd2
 struct circle : pt {
 public:
 	double r = 0.0;
-	posPlane orientation = posPlane::NA;
+	posPlane orientation = posPlane::NA;	//orientation of detector cross section: XZ, YZ, XY
 };
 
 struct pt3d {
-	double x, y, z;
+	double x, y, z;	//coordinates in space based on cross sectional orientation
 	pt3d operator- (pt3d p) {
 		pt3d res = { x - p.x, y - p.y, z - p.z };
 		return res;
 	}
 };
-
+//cylinder is based on circle
 struct cylinder : circle {
 	double x = 0.0;
 	double y = 0.0;
@@ -39,13 +39,13 @@ struct cylinder : circle {
 public:
 	cylinder(circle c, double crd3) {
 		circle::r = c.r;
-		if (c.orientation == posPlane::XZ) {
+		if (c.orientation == posPlane::XZ) {	//for XZ orientation
 			x = c.crd1;
 			y = crd3;
 			z = c.crd2;
 			circle::orientation = c.orientation;
 		}
-		else if (c.orientation == posPlane::YZ) {
+		else if (c.orientation == posPlane::YZ) { //for YZ orientation
 			x = crd3;
 			y = c.crd1;
 			z = c.crd2;
@@ -60,17 +60,17 @@ public:
 		circle::orientation = posPlane::NA;
 	}
 };
-
+//common equation of line
 struct line {
 	double a, b, c;
 };
 
-const double EPS = 1E-9;
+const double EPS = 1E-9;//epsilon, defines how accurate we want to be
 
 double sqr(double a) {
 	return a * a;
 }
-
+//finds inner and outer tangents to 2 circles
 void tangents(pt c, double r1, double r2, vector<line>& ans) {
 	double r = r2 - r1;
 	double z = sqr(c.crd1) + sqr(c.crd2);
@@ -83,7 +83,7 @@ void tangents(pt c, double r1, double r2, vector<line>& ans) {
 	l.c = r1;
 	ans.push_back(l);
 }
-
+//creates vector of 4 tangents
 vector<line> tangents(circle a, circle b) {
 	vector<line> ans;
 	for (int i = -1; i <= 1; i += 2)
@@ -93,7 +93,7 @@ vector<line> tangents(circle a, circle b) {
 		ans[i].c -= ans[i].a * a.crd1 + ans[i].b * a.crd2;
 	return ans;
 }
-
+//common equation of plane
 struct plane {
 	double a;
 	double b;
