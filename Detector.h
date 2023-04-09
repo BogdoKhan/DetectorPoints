@@ -12,7 +12,7 @@ public:
 	Detector();
 	Detector(std::string emplacement, bool isHit);
 	cylinder _isoCylinder = cylinder();
-	const double DetectorRadius = 1.0;
+	double DetectorRadius = 1.0;
 	bool isHit() const;
 private:
 	std::string _emplacement = "NULL";

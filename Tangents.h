@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <iostream>
 
 using namespace std;
 
@@ -22,6 +23,16 @@ struct circle : pt {
 public:
 	double r = 0.0;
 	posPlane orientation = posPlane::NA;	//orientation of detector cross section: XZ, YZ, XY
+	circle(double crd1, double crd2, double r) {
+		pt::crd1 = crd1;
+		pt::crd2 = crd2;
+		circle::r = r;
+	};
+	circle() {
+		pt::crd1 = 0.0;
+		pt::crd2 = 0.0;
+		circle::r = 0.0;
+	}
 };
 
 struct pt3d {
@@ -75,7 +86,7 @@ void tangents(pt c, double r1, double r2, vector<line>& ans) {
 	double r = r2 - r1;
 	double z = sqr(c.crd1) + sqr(c.crd2);
 	double d = z - sqr(r);
-	if (d < -EPS)  return;
+	if (abs(d) < -EPS)  return;
 	d = sqrt(abs(d));
 	line l;
 	l.a = (c.crd1 * r + c.crd2 * d) / z;
@@ -93,6 +104,18 @@ vector<line> tangents(circle a, circle b) {
 		ans[i].c -= ans[i].a * a.crd1 + ans[i].b * a.crd2;
 	return ans;
 }
+
+vector<line> tangents(cylinder cyl1, cylinder cyl2) {
+	circle a = circle(cyl1.crd1, cyl1.crd2, cyl1.r);
+	circle b = circle(cyl2.crd1, cyl2.crd2, cyl2.r);
+	vector<line> ans = tangents(a, b);
+	//for (int i = -1; i <= 1; i += 2)
+	//	for (int j = -1; j <= 1; j += 2)
+	//		tangents(b - a, a.r * i, b.r * j, ans);
+	//for (size_t i = 0; i < ans.size(); ++i)
+	//	ans[i].c -= ans[i].a * a.crd1 + ans[i].b * a.crd2;
+	return ans;
+}
 //common equation of plane
 struct plane {
 	double a;
@@ -103,4 +126,13 @@ struct plane {
 	plane() : a(0), b(0), c(0), d(0) {};
 	plane(double _a, double _b, double _c, double _d) :
 		a(_a), b(_b), c(_c), d(_d) {};
+
 };
+
+std::ostream& operator<< (std::ostream& out, const plane& pp) {
+	out << "Plane equation: " << pp.a;
+	(pp.b >= 0) ? out << "x + " : out << "x "; out << pp.b;
+	(pp.c >= 0) ? out << "y + " : out << "y "; out << pp.c;
+	(pp.d >= 0) ? out << "z + " : out << "z "; out << pp.d;
+	return out;
+}
