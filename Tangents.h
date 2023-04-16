@@ -37,10 +37,17 @@ public:
 
 struct pt3d {
 	double x, y, z;	//coordinates in space based on cross sectional orientation
+	pt3d() {
+		x = 0; y = 0; z = 0;
+	}
+	pt3d(double x_, double y_, double z_) {
+		x = x_; y = y_; z = z_;
+	}
 	pt3d operator- (pt3d p) {
-		pt3d res = { x - p.x, y - p.y, z - p.z };
+		pt3d res( (x - p.x), (y - p.y), (z - p.z) );
 		return res;
 	}
+
 };
 //cylinder is based on circle
 struct cylinder : circle {
@@ -101,7 +108,7 @@ vector<line> tangents(circle a, circle b) {
 		for (int j = -1; j <= 1; j += 2)
 			tangents(b - a, a.r * i, b.r * j, ans);
 	for (size_t i = 0; i < ans.size(); ++i)
-		ans[i].c -= ans[i].a * a.crd1 + ans[i].b * a.crd2;
+		ans[i].c -= (ans[i].a * a.crd1 + ans[i].b * a.crd2);
 	return ans;
 }
 
@@ -109,11 +116,6 @@ vector<line> tangents(cylinder cyl1, cylinder cyl2) {
 	circle a = circle(cyl1.crd1, cyl1.crd2, cyl1.r);
 	circle b = circle(cyl2.crd1, cyl2.crd2, cyl2.r);
 	vector<line> ans = tangents(a, b);
-	//for (int i = -1; i <= 1; i += 2)
-	//	for (int j = -1; j <= 1; j += 2)
-	//		tangents(b - a, a.r * i, b.r * j, ans);
-	//for (size_t i = 0; i < ans.size(); ++i)
-	//	ans[i].c -= ans[i].a * a.crd1 + ans[i].b * a.crd2;
 	return ans;
 }
 //common equation of plane
