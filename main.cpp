@@ -14,7 +14,7 @@ int main() {
 
 	GetDetectorHitData(0b01010101, isochrones, detArray, 5.0);
 	vector <pt3d> hitPoints = GetHitPoints(detArray);
-	//pt3d hitPointsErr = {2*10.0/sqrt(12), 2 * 10.0 / sqrt(12) , 2 * 10.0 / sqrt(12) };
+	////pt3d hitPointsErr = {2*10.0/sqrt(12), 2 * 10.0 / sqrt(12) , 2 * 10.0 / sqrt(12) };
 	size_t counter = 1;
 	for (pt3d& i : hitPoints) {
 		cout << "Point: " << counter << " {" 

@@ -10,6 +10,8 @@
 #include "Tangents.h"
 #include "RandGen.h"
 
+#define PI 3.14159265
+
 void ShowDetArrayData(std::vector<Detector>& detArray);
 
 double getCoord1_TangPt(const double& x1, const double& y1, const double& r1,
@@ -198,16 +200,14 @@ void GetDetectorHitData(const uint8_t& word,
 		if (DetectorNames.at(j).at(0) == 'X') {
 			det._isoCylinder.orientation = posPlane::XZ;
 
-			det._isoCylinder.x = j / 2 * tubeRadius + j % 2 * 2 * tubeRadius;
-			det._isoCylinder.circle::pt::crd1 = det._isoCylinder.x;
 			//j = 0, 1, 2, 3, 4, 5, 6, 7
 			//x = 0 +0 = 0 || 0 + 1*2 = 2 || 1 + 0 = 1 || 1 + 2 = 3...
-			det._isoCylinder.z = j / 2 * tubeRadius;
-			if (j / 2 < 1) det._isoCylinder.z;
-			else det._isoCylinder.z;
-			det._isoCylinder.circle::pt::crd2 = det._isoCylinder.z;
-
+			det._isoCylinder.x = j / 2 * tubeRadius + j % 2 * 2 * tubeRadius;
 			det._isoCylinder.y = 0.0;
+			det._isoCylinder.z = floor(j / 2) * 2 * tubeRadius * cos(30 * PI / 180);
+
+			det._isoCylinder.circle::pt::crd1 = det._isoCylinder.x;
+			det._isoCylinder.circle::pt::crd2 = det._isoCylinder.z;
 			det._isoCylinder.r = SetIsochroneRadius(isochrones.at(j), tubeRadius);
 		}
 
@@ -216,7 +216,8 @@ void GetDetectorHitData(const uint8_t& word,
 
 			det._isoCylinder.x = 0.0;
 			det._isoCylinder.y = (j - 4) / 2 * tubeRadius + (j - 4) % 2 * 2 * tubeRadius;
-			det._isoCylinder.z = j / 2 * tubeRadius;
+			det._isoCylinder.z = 2 * tubeRadius + floor((j - 2) / 2) * 2 * tubeRadius * cos(30 * PI / 180);
+
 			det._isoCylinder.circle::pt::crd1 = det._isoCylinder.y;
 			det._isoCylinder.circle::pt::crd2 = det._isoCylinder.z;
 			det._isoCylinder.r = SetIsochroneRadius(isochrones.at(j), tubeRadius);
@@ -247,7 +248,7 @@ vector<pt3d> GetHitPoints(std::vector<Detector>& detArray) {
 	vector<pt3d> hitPoints = {};
 	vector<Detector> workingDets = {};
 	map<posPlane, vector<plane>> tangPlanesAllDir = { {posPlane::XZ, {}}, {posPlane::YZ, {}} };
-	double z_planePosition = sqrt(2) * detArray.at(0).DetectorRadius; //sqrt(2) * R is the position of plane dividing XZ and YZ detectors
+	double z_planePosition = detArray.at(0).DetectorRadius * (1 + 2*cos(30*PI/180)); //R + 2Rcos(30*) is the position of plane dividing XZ and YZ detectors
 	//define 4 working detectors
 	for (const Detector& det : detArray) {
 		if (det.isHit()) workingDets.push_back(det);
