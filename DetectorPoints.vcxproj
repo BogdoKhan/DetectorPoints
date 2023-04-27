@@ -132,6 +132,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Detector.h" />
+    <ClInclude Include="GSL_Solvers.h" />
     <ClInclude Include="HitData.h" />
     <ClInclude Include="RandGen.h" />
     <ClInclude Include="Tangents.h" />

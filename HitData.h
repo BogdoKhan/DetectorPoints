@@ -9,16 +9,11 @@
 #include "Detector.h"
 #include "Tangents.h"
 #include "RandGen.h"
+#include "GSL_Solvers.h"
 
 #define PI 3.14159265
 
 void ShowDetArrayData(std::vector<Detector>& detArray);
-
-double getCoord1_TangPt(const double& x1, const double& y1, const double& r1,
-	const double& d, const double& e, const double& f);
-
-double getCoord2_TangPt(const double& x1, const double& y1, const double& r1,
-	const double& d, const double& e, const double& f);
 
 pt tangentCrd(const double& _x1, const double& _y1, const double& _r1,
 	const double& _d, const double& _e, const double& _f, bool flag_round);
@@ -32,7 +27,7 @@ pt3d HitPointOnDefinedPlane(const plane& pl1, const plane& pl2, const double& z_
 
 double SetIsochroneRadius(double& isoRadius, const double& tubeRadius);
 
-void GetDetectorHitData(const uint8_t& word,
+void GetDetectorHitData(
 	std::vector<double>& isochrones,
 	std::vector<Detector>& detArray,
 	const double& tubeRadius);
@@ -41,92 +36,49 @@ void ShowDetArrayData(std::vector<Detector>& detArray);
 
 vector<pt3d> GetHitPoints(std::vector<Detector>& detArray);
 
-//There are parts of 
-//magic equations for coord1 (let it be x) and coord2 (let it be y)
-//calcualted with Wolfram Mathematica
-//Solve[{(x - x1)^2 + (y - y1)^2 == r1^2, 
-//y == -((d*x + e)/f)}, {x, y}]
-//this is the same as
-//Solve[{(x - a)^2 + (y - b)^2 == r^2, 
-//d*x + f*y + e == 0}, {x, y}]
-
-//First coordinate (x or Y) for tangence point equation
-double getCoord1_TangPt(const double& x1, const double& y1, const double& r1,
-	const double& d, const double& e, const double& f) {
-	double x_part1 = 1 / (sqr(d) + sqr(f)) * 0.5;
-	double x_part2 = -2 * d * e - 2 * y1 * d * f + 2 * x1 * sqr(f);
-	double x_part3 = sqr(2 * d * e + 2 * y1 * d * f - 2 * x1 * sqr(f));
-	double x_part4 = 4 * (sqr(d) + sqr(f));
-	double x_part5 = (sqr(e) + 2 * y1 * e * f + sqr(x1) * sqr(f) +
-		sqr(y1) * sqr(f) - sqr(f) * sqr(r1));
-	double value = (x_part1 * (x_part2 - sqrt(abs(x_part3 - x_part4 * x_part5))));
-	return value;
-}
-//2nd coordiante (typically Z) for tangence point equation
-double getCoord2_TangPt(const double& x1, const double& y1, const double& r1,
-	const double& d, const double& e, const double& f) {
-	double y_part1 = (1 / f);
-	double y_part2 = -e;
-	double y_part3 = (sqr(d) * e) / (sqr(d) + sqr(f));
-	double y_part4 = (y1 * sqr(d) * f) / (sqr(d) + sqr(f));
-	double y_part5 = (x1 * d * sqr(f)) / (sqr(d) + sqr(f));
-	double y_part6 = 1 / (2 * (sqr(d) + sqr(f))) * d;
-	double y_part7 = sqr(2 * d * e + 2 * y1 * d * f - 2 * x1 * sqr(f));
-	double y_part8 = 4 * (sqr(d) + sqr(f));
-	double y_part9 = (sqr(e) + 2 * y1 * e * f + sqr(x1) * sqr(f) +
-		sqr(y1) * sqr(f) - sqr(f) * sqr(r1));
-	double value = y_part1 * (y_part2 + y_part3 + y_part4 - y_part5 + y_part6 *
-		sqrt(abs(y_part7 - y_part8 * y_part9)));
-	return value;
-}
-
-//(x-x1)^2 + (y-y1)^2 == R1^2;
-//dx + fy + e = 0
-//returns coordinates of tangence point between line & circle1
-//(x_tang, y_tang)
-//!!DELETE flag_round, check
 pt tangentCrd(const double& _x1, const double& _y1, const double& _r1,
 	const double& _d, const double& _e, const double& _f, bool flag_round) {
-	double coef = 1.0e6; //round to 6th digit, else goes to nan
-	double x1 = std::round(_x1 * coef) / coef;
-	double y1 = std::round(_y1 * coef) / coef;
-	double r1 = std::round(_r1 * coef) / coef;
-	double d = std::round(_d * coef) / coef;
-	double e = std::round(_e * coef) / coef;
-	double f = std::round(_f * coef) / coef;
+	const gsl_multiroot_fsolver_type* T; //solver type
+	gsl_multiroot_fsolver* s;			 //solver as object
 
-	double resultX = 0.0;
-	double resultY = 0.0;
-	pt result = {};
+	int status;							//GSL_CONTINUE or GSL_SUCCESS
+	size_t iter = 0;
+	const size_t n = 2;
 
-	// 
-	//tangence point coordinates
-	result = { getCoord1_TangPt(x1, y1, r1, d, e, f), getCoord2_TangPt(x1, y1, r1, d, e, f) };
+	struct params_tangentCrd p =
+	{ _x1, _y1, _r1, _d, _e, _f }; // structure containing parameters
 
-	//if we get NaN - try to get solution with ceil rounded values
-	//MAYBE NOT NEEDED
-	if ((isnan(resultX) || isnan(resultY)) && !flag_round) {
-		x1 = std::ceil(_x1 * coef) / coef;
-		y1 = std::ceil(_y1 * coef) / coef;
-		r1 = (std::round(_r1 * coef) / coef);
-		d = std::ceil(_d * coef) / coef;
-		e = std::ceil(_e * coef) / coef;
-		f = std::ceil(_f * coef) / coef;
-		flag_round = true;
-		result = tangentCrd(x1, y1, r1, d, e, f, true);
+	gsl_multiroot_function f;
+	f.f = &circleAndLine;	//our function
+	f.n = n;				//max dimensions
+	f.params = &p;			//structure containing parameters
 
-	}
-	//DEPRECATED, CHECK AND DELETE IF NOT NECESSARY
-	//if (isnan(result.crd1) || isnan(result.crd2)) {
-	//	x1 = std::floor(_x1 * coef) / coef;
-	//	y1 = std::floor(_y1 * coef) / coef;
-	//	r1 = std::floor(_r1 * coef) / coef;
-	//	d = std::floor(_d * coef) / coef;
-	//	e = std::floor(_e * coef) / coef;
-	//	f = std::floor(_f * coef) / coef;
-	//	result = tangentCrd(x1, y1, r1, d, e, f, true);
-	//}
-	return result;
+	double x_init[2] = { _x1 + _r1, _y1 + _r1 }; //non-zero initial conditions to prevent algorithm from being stuck
+
+	gsl_vector* x = gsl_vector_alloc(n);		//initial guess for variables
+	gsl_vector_set(x, 0, x_init[0]);
+	gsl_vector_set(x, 1, x_init[1]);
+
+	T = gsl_multiroot_fsolver_hybrids;				//solver type
+	s = gsl_multiroot_fsolver_alloc(T, 2);
+	gsl_multiroot_fsolver_set(s, &f, x);			//set solver
+	print_state(iter, s);
+	do
+	{
+		iter++;
+		status = gsl_multiroot_fsolver_iterate(s);
+		print_state(iter, s);
+		if (status) /* check if solver is stuck */
+			break;
+		status =
+			gsl_multiroot_test_residual(s->f, 1e-7);
+	} while (status == GSL_CONTINUE && iter < 1000);
+
+	printf("status = %s\n", gsl_strerror(status));
+	std::cout << "crd1: " << gsl_vector_get(s->x, 0) << " crd2: "
+		<< gsl_vector_get(s->x, 1) << std::endl;
+
+	return { gsl_vector_get(s->x, 0), gsl_vector_get(s->x, 1) };
 }
 
 pt3d tangentCrd(const cylinder& cyl,
@@ -136,8 +88,8 @@ pt3d tangentCrd(const cylinder& cyl,
 	double y1 = std::round(cyl.crd2 * coef) / coef;
 	double r1 = std::round(cyl.r * coef) / coef;
 	double d = std::round(lin.a * coef) / coef;
-	double e = std::round(lin.c * coef) / coef; //DO NOT FORGET, HERE e-> c in ax + by+ c == 0;
-	double f = std::round(lin.b * coef) / coef; // and here f -> b
+	double e = std::round(lin.b * coef) / coef; //fixed swapped values
+	double f = std::round(lin.c * coef) / coef; 
 
 	pt tangPt2d = tangentCrd(x1, y1, r1, d, e, f, false);
 
@@ -172,37 +124,50 @@ pt3d HitPointOnDefinedPlane(const plane& pl1, const plane& pl2, const double& z_
 	pt.y = -(pl2.c * pt.z + pl2.d) / pl2.b;
 	return pt;
 }
-
+//set constraints on isochrone radius, it must be above 0 and below tube radius
 double SetIsochroneRadius(double& isoRadius, const double& tubeRadius) {
 	if (isnan(isoRadius) || isoRadius >= tubeRadius || isoRadius <= 0) return tubeRadius;
 	return isoRadius;
 }
-
+//form binary word from isochrones vector
 //0b|y22|y21|y12|y11|'|x22|x21|x12|x11|
+//starts from 0b0000'0001, corresponding to x11
+//please note that x11 corresponds to the first element of isochrones vector
+uint8_t GetWordFromIsochrones(const std::vector<double>& isochrones) {
+	uint8_t word = 0b0000'0000;
+	for (size_t i = 0b0000'0001, j = 0; i <= 0b1000'0000; i <<= 0b0000'0001, j++) {
+		if (isochrones.at(j) != 0.0 && !isnan(isochrones.at(j))) {
+			word += i;
+		}
+	}
+	return word;
+}
+
 //here we create the grid for our detectors field
-void GetDetectorHitData(const uint8_t& word,
+void GetDetectorHitData(
 	std::vector<double>& isochrones,
 	std::vector<Detector>& detArray,
 	const double& tubeRadius) {
 	std::vector<std::string> DetectorNames = {
 		"X11", "X12", "X21", "X22", "Y11", "Y12", "Y21", "Y22"
 	};
-
+	const uint8_t word = GetWordFromIsochrones(isochrones);
 	//std::vector<Detector> detArray;
 	for (size_t i = 0b0000'0001, j = 0; i <= 0b1000'0000; i <<= 0b0000'0001, j++) {
 		std::cout << (std::bitset<8>)word << " "
-			<< (std::bitset<8>)i << " " << ((std::bitset<8>)(word & i)).any() << " " << DetectorNames.at(j) << std::endl;
+			<< (std::bitset<8>)i << " " << ((std::bitset<8>)(word & i)).any() << " " << DetectorNames.at(j) << std::endl; //status info
 
 		Detector det(DetectorNames.at(j), ((std::bitset<8>)(word & i)).any()); //create detector: its emplacement(X,Y); was it hit? (counts 1s in binary corresp to its mask);
-		det._isoCylinder = cylinder();
-		det.DetectorRadius = tubeRadius;
-		det._isoCylinder.circle::orientation = det._isoCylinder.orientation;
-		if (DetectorNames.at(j).at(0) == 'X') {
+		det._isoCylinder = cylinder();											//create cylinder as base of detector
+		det.DetectorRadius = tubeRadius;										//detector tube radius is defined now
+		det._isoCylinder.circle::orientation = det._isoCylinder.orientation;	//set orientation of detector and place it on the grid
+
+		if (DetectorNames.at(j).at(0) == 'X') {									//if name starts with "X"
 			det._isoCylinder.orientation = posPlane::XZ;
 
 			//j = 0, 1, 2, 3, 4, 5, 6, 7
 			//x = 0 +0 = 0 || 0 + 1*2 = 2 || 1 + 0 = 1 || 1 + 2 = 3...
-			det._isoCylinder.x = j / 2 * tubeRadius + j % 2 * 2 * tubeRadius;
+			det._isoCylinder.x = floor(j / 2) * tubeRadius + j % 2 * 2 * tubeRadius;	//0; 10; 5; 15
 			det._isoCylinder.y = 0.0;
 			det._isoCylinder.z = floor(j / 2) * 2 * tubeRadius * cos(30 * PI / 180);
 
@@ -215,7 +180,7 @@ void GetDetectorHitData(const uint8_t& word,
 			det._isoCylinder.orientation = posPlane::YZ;
 
 			det._isoCylinder.x = 0.0;
-			det._isoCylinder.y = (j - 4) / 2 * tubeRadius + (j - 4) % 2 * 2 * tubeRadius;
+			det._isoCylinder.y = floor((j - 4) / 2) * tubeRadius + (j - 4) % 2 * 2 * tubeRadius; //0;10;5;15
 			det._isoCylinder.z = 2 * tubeRadius + floor((j - 2) / 2) * 2 * tubeRadius * cos(30 * PI / 180);
 
 			det._isoCylinder.circle::pt::crd1 = det._isoCylinder.y;
