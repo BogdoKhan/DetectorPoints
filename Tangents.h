@@ -138,3 +138,9 @@ std::ostream& operator<< (std::ostream& out, const plane& pp) {
 	(pp.d >= 0) ? out << "z + " : out << "z "; out << pp.d;
 	return out;
 }
+
+std::ostream& operator<< (std::ostream& out, const pt3d& pt) {
+	out << "point at cooridnates: {" << pt.x;
+	out << ", " << pt.y << ", " << pt.z << "}";
+	return out;
+}

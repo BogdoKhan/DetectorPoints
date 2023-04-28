@@ -71,12 +71,21 @@ pt tangentCrd(const double& _x1, const double& _y1, const double& _r1,
 		if (status) /* check if solver is stuck */
 			break;
 		status =
-			gsl_multiroot_test_residual(s->f, 1e-7);
+			gsl_multiroot_test_residual(s->f, 1e-6);
 	} while (status == GSL_CONTINUE && iter < 1000);
 
 	printf("status = %s\n", gsl_strerror(status));
 	std::cout << "crd1: " << gsl_vector_get(s->x, 0) << " crd2: "
 		<< gsl_vector_get(s->x, 1) << std::endl;
+	if (status == GSL_SUCCESS || (gsl_vector_get(s->f, 0) < 5e-4 &&
+		(gsl_vector_get(s->f, 1) < 1e-4))) {
+		std::cout << gsl_vector_get(s->x, 0) << " " << gsl_vector_get(s->x, 1)
+			<< std::endl;
+	}
+	else {
+		std::cout << "Roots not found\n";
+		return { NAN, NAN };
+	}
 
 	return { gsl_vector_get(s->x, 0), gsl_vector_get(s->x, 1) };
 }
@@ -95,6 +104,7 @@ pt3d tangentCrd(const cylinder& cyl,
 
 	if (cyl.orientation == posPlane::XZ) return { tangPt2d.crd1, 0.0, tangPt2d.crd2 };
 	else if (cyl.orientation == posPlane::YZ) return { 0.0, tangPt2d.crd1, tangPt2d.crd2 };
+
 	pt3d result{ tangPt2d.crd1, 0.0, tangPt2d.crd2 };
 	return result;
 }
@@ -211,6 +221,7 @@ void ShowDetArrayData(std::vector<Detector>& detArray) {
 
 vector<pt3d> GetHitPoints(std::vector<Detector>& detArray) {
 	vector<pt3d> hitPoints = {};
+	vector<pt3d> tangencyPoints = {};
 	vector<Detector> workingDets = {};
 	map<posPlane, vector<plane>> tangPlanesAllDir = { {posPlane::XZ, {}}, {posPlane::YZ, {}} };
 	double z_planePosition = detArray.at(0).DetectorRadius * (1 + 2*cos(30*PI/180)); //R + 2Rcos(30*) is the position of plane dividing XZ and YZ detectors
@@ -224,6 +235,7 @@ vector<pt3d> GetHitPoints(std::vector<Detector>& detArray) {
 			vector<line> tangLines1 = tangents(workingDets.at(0)._isoCylinder, workingDets.at(1)._isoCylinder);
 			for (line& line_ : tangLines1) {
 				pt3d tangPt = tangentCrd(workingDets.at(0)._isoCylinder, line_);
+				tangencyPoints.push_back(tangPt);
 				plane tangPlane = TangPlaneToCylinder(tangPt, workingDets.at(0)._isoCylinder);
 				tangPlanesAllDir.at(posPlane::XZ).push_back(tangPlane);
 			}
@@ -232,6 +244,7 @@ vector<pt3d> GetHitPoints(std::vector<Detector>& detArray) {
 			vector<line> tangLines1 = tangents(workingDets.at(2)._isoCylinder, workingDets.at(3)._isoCylinder);
 			for (line& line_ : tangLines1) {
 				pt3d tangPt = tangentCrd(workingDets.at(2)._isoCylinder, line_);
+				tangencyPoints.push_back(tangPt);
 				plane tangPlane = TangPlaneToCylinder(tangPt, workingDets.at(2)._isoCylinder);
 				tangPlanesAllDir.at(posPlane::YZ).push_back(tangPlane);
 			}
@@ -242,6 +255,81 @@ vector<pt3d> GetHitPoints(std::vector<Detector>& detArray) {
 		for (plane& plYZ : tangPlanesAllDir.at(posPlane::YZ)) {
 			hitPoints.push_back(HitPointOnDefinedPlane(plXZ, plYZ, z_planePosition));
 		}
+	}
+	size_t counter = 1;
+	for (pt3d& i : tangencyPoints) {
+		std::cout << "No. " << counter << " tangency " << i << std::endl;
+		counter++;
+	}
+	return hitPoints;
+}
+
+double geomVectorLength(const pt3d& pt1, const pt3d& pt2) {
+	return sqrt(gsl_pow_2(pt2.x - pt1.x) + gsl_pow_2(pt2.y - pt1.y) + gsl_pow_2(pt2.z - pt1.z));
+}
+
+vector<pt3d> GetHitPointsByLines(std::vector<Detector>& detArray) {
+	vector<pt3d> hitPoints = {};
+	vector<pt3d> tangencyPoints = {};
+	vector<Detector> workingDets = {};
+	map<posPlane, vector<plane>> tangPlanesAllDir = { {posPlane::XZ, {}}, {posPlane::YZ, {}} };
+	double z_planePosition = detArray.at(0).DetectorRadius * (1 + 2 * cos(30 * PI / 180)); //R + 2Rcos(30*) is the position of plane dividing XZ and YZ detectors
+	//define 4 working detectors
+	for (const Detector& det : detArray) {
+		if (det.isHit()) workingDets.push_back(det);
+	}
+	//check if all 4 working detectors for each layer are chosen propely
+	if (workingDets.size() >= 4) {
+		if (workingDets.at(0)._isoCylinder.orientation == posPlane::XZ && workingDets.at(1)._isoCylinder.orientation == posPlane::XZ) {
+			vector<line> tangLines1 = tangents(workingDets.at(0)._isoCylinder, workingDets.at(1)._isoCylinder);
+			for (line& line_ : tangLines1) {
+
+				double x_intersect = -(line_.b * z_planePosition + line_.c) / line_.a;
+				pt3d intersectPt{ x_intersect, 0.0, z_planePosition };
+				pt3d tangPt = tangentCrd(workingDets.at(0)._isoCylinder, line_);
+				pt3d tangPtPerp = tangPt;
+				tangPtPerp.z = z_planePosition;
+				double tangentLength = geomVectorLength(tangPt, intersectPt);
+				double tangPerpLength = geomVectorLength(tangPt, tangPtPerp);
+				std::cout <<  "Angle is: " 
+					<< (asin(tangPerpLength / tangentLength)/PI*180) 
+					<< "degrees\n";
+
+				for (size_t item = 0; item < 4; item++) {
+					pt checknan{ NAN, NAN };
+					if (detArray.at(item).isHit()) continue;
+					if (!isnan(tangentCrd(detArray.at(item)._isoCylinder, line_).z))
+					{
+
+					}
+					else break;
+				}
+
+				tangencyPoints.push_back(tangPt);
+				plane tangPlane = TangPlaneToCylinder(tangPt, workingDets.at(0)._isoCylinder);
+				tangPlanesAllDir.at(posPlane::XZ).push_back(tangPlane);
+			}
+		}
+		if (workingDets.at(2)._isoCylinder.orientation == posPlane::YZ && workingDets.at(3)._isoCylinder.orientation == posPlane::YZ) {
+			vector<line> tangLines1 = tangents(workingDets.at(2)._isoCylinder, workingDets.at(3)._isoCylinder);
+			for (line& line_ : tangLines1) {
+				pt3d tangPt = tangentCrd(workingDets.at(2)._isoCylinder, line_);
+				tangencyPoints.push_back(tangPt);
+				plane tangPlane = TangPlaneToCylinder(tangPt, workingDets.at(2)._isoCylinder);
+				tangPlanesAllDir.at(posPlane::YZ).push_back(tangPlane);
+			}
+		}
+	}
+	//get coordinates of hit points at the plane between XZ and YZ detectors
+	for (plane& plXZ : tangPlanesAllDir.at(posPlane::XZ)) {
+		for (plane& plYZ : tangPlanesAllDir.at(posPlane::YZ)) {
+			hitPoints.push_back(HitPointOnDefinedPlane(plXZ, plYZ, z_planePosition));
+		}
+	}
+	size_t counter = 1;
+	for (pt3d& i : tangencyPoints) {
+		std::cout << "No. " << counter << " tangency " << i << std::endl;
+		counter++;
 	}
 	return hitPoints;
 }
