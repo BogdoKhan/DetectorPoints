@@ -17,10 +17,23 @@ int main() {
 	vector <pt3d> hitPoints = GetHitPoints(detArray);
 	////pt3d hitPointsErr = {2*10.0/sqrt(12), 2 * 10.0 / sqrt(12) , 2 * 10.0 / sqrt(12) };
 	size_t counter = 1;
+	cout << "Hit points, old counter: \n";
 	for (pt3d& i : hitPoints) {
 		cout << "Point: " << counter << " {" 
 			<< i.x << 
 			", " << i.y  <<
+			", " << i.z << "} \n";
+		counter++;
+	}
+
+	vector <pt3d> hitPointsByLines = GetHitPointsByLines(detArray);
+	////pt3d hitPointsErr = {2*10.0/sqrt(12), 2 * 10.0 / sqrt(12) , 2 * 10.0 / sqrt(12) };
+	counter = 1;
+	cout << "Hit points, new counter: \n";
+	for (pt3d& i : hitPointsByLines) {
+		cout << "Point: " << counter << " {"
+			<< i.x <<
+			", " << i.y <<
 			", " << i.z << "} \n";
 		counter++;
 	}
