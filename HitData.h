@@ -282,6 +282,88 @@ double getIncidenceAngle(const pt3d& intersectPt, const pt3d& tangPt, const pt3d
 	return incidenceAngle;
 }
 
+void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const posPlane& planePosition,
+	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
+	const double& z_planePosition) {
+	size_t i_start = 0;
+	if (planePosition == posPlane::XZ) i_start = 0;
+	else if (planePosition == posPlane::YZ) i_start = 4;
+	size_t i_end = i_start + 4;
+
+	map<size_t, vector<line>> tangentLines;
+	for (size_t i = i_start; i < i_end; i++) {
+		if (detArray.at(i).isHit()) {
+			tangentLines[i] = {};
+			continue;
+		}
+		else {
+			tangentLines[i] = tangents(workingDets.at(planePosition).at(0)._isoCylinder, detArray.at(i)._isoCylinder);
+			for (line& line_ : tangentLines.at(i)) {
+				double intersect_crd = -(line_.b * z_planePosition + line_.c) / line_.a;
+				pt3d intersectPt{ 0.0, 0.0, z_planePosition };
+				if (planePosition == posPlane::XZ) intersectPt.x = intersect_crd;
+				else if (planePosition == posPlane::YZ) intersectPt.y = intersect_crd;
+				pt3d tangPt = tangentCrd(workingDets.at(planePosition).at(0)._isoCylinder, line_, true);
+				pt3d tangPtPerp = tangPt;
+				tangPtPerp.z = z_planePosition;
+				double incidenceAngle = getIncidenceAngle(intersectPt, tangPt, tangPtPerp);
+
+				bool noIntersectWithNonActiveDets = false;
+				for (size_t item = i_start; item < i_end; item++) {
+					if (detArray.at(item).isHit() || item == i) continue;
+					noIntersectWithNonActiveDets = false;
+					if (isnan(tangentCrd(detArray.at(item)._isoCylinder, line_, false).z))
+					{
+						noIntersectWithNonActiveDets = true;
+					}
+					else break;
+				}
+				if (noIntersectWithNonActiveDets) {
+					intersectionPoints[planePosition].push_back(intersectPt);
+				}
+			}
+		}
+
+	}
+}
+
+void GetIntersectionPoint_case2(const std::vector<Detector>& detArray, const posPlane& planePosition,
+	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
+	const double& z_planePosition) {
+	size_t i_start = 0;
+	if (planePosition == posPlane::XZ) i_start = 0;
+	else if (planePosition == posPlane::YZ) i_start = 4;
+	size_t i_end = i_start + 4;
+
+	vector<line> tangLines1 = tangents(workingDets.at(planePosition).at(0)._isoCylinder, 
+		workingDets.at(planePosition).at(1)._isoCylinder);
+	for (line& line_ : tangLines1) {
+
+		double intersect_crd = -(line_.b * z_planePosition + line_.c) / line_.a;		//x coordinate of intersection point between tangent line and specific line at z_planePosition (@XZ plane)
+		pt3d intersectPt{ 0.0, 0.0, z_planePosition };
+		if (planePosition == posPlane::XZ) intersectPt.x = intersect_crd;
+		else if (planePosition == posPlane::YZ) intersectPt.y = intersect_crd;			//intersection point at XZ plane, y coordinate is set to 0.0
+		pt3d tangPt = tangentCrd(workingDets.at(planePosition).at(0)._isoCylinder, line_, true);//tangence point coordinate
+		pt3d tangPtPerp = tangPt;													//projection of tangence point to z_planePosition 
+		tangPtPerp.z = z_planePosition;												//so we can build the normal from tangPT to z_planePosition and build a triangle (tangPt, tangPtPerp, intersectPt)
+		double incidenceAngle = getIncidenceAngle(intersectPt, tangPt, tangPtPerp);	//trajectory projection incidence angle is found as ASIN[(tangence line)/(perpendicular)] 
+
+		bool noIntersectWithNonActiveDets = false;									//here we check if the found trajectory does not cross the cylinders of non-active detectors
+		for (size_t item = i_start; item < i_end; item++) {
+			if (detArray.at(item).isHit()) continue;								//we skip intesection with active detector, as they are obviously hit
+			noIntersectWithNonActiveDets = false;
+			if (isnan(tangentCrd(detArray.at(item)._isoCylinder, line_, false).z))	//if common point coordinates for the line and non-active detector are {NAN, NAN}
+			{
+				noIntersectWithNonActiveDets = true;								//there is no intersection between our line and detector cylinder, we can check next detector
+			}
+			else break;																//else it crosses the cylinder, and we have to break the cycle
+		}
+		if (noIntersectWithNonActiveDets) {
+			intersectionPoints[planePosition].push_back(intersectPt);				//all legit points are stored in vector corresponding to the detector working plane
+		}
+	}
+}
+
 vector<pt3d> GetHitPointsByLines(std::vector<Detector>& detArray) {
 	vector<pt3d> hitPoints = {};
 	map<posPlane, vector<Detector>> workingDets = { {posPlane::XZ, {}}, {posPlane::YZ, {}} };
@@ -292,74 +374,44 @@ vector<pt3d> GetHitPointsByLines(std::vector<Detector>& detArray) {
 		if (det.isHit()) workingDets[det._isoCylinder.orientation].push_back(det);
 	}
 	//check if all 4 working detectors for each layer are chosen propely
-	if (workingDets.at(posPlane::XZ).size() > 0) {
+	if (workingDets[posPlane::XZ].size() > 0) {
 		switch (workingDets.at(posPlane::XZ).size()) {
-			case 1:
-			{
-
-			}
-			case 2:
-			{
-				vector<line> tangLines1 = tangents(workingDets.at(posPlane::XZ).at(0)._isoCylinder, workingDets.at(posPlane::XZ).at(1)._isoCylinder);
-				for (line& line_ : tangLines1) {
-
-					double x_intersect = -(line_.b * z_planePosition + line_.c) / line_.a;		//x coordinate of intersection point between tangent line and specific line at z_planePosition (@XZ plane)
-					pt3d intersectPt{ x_intersect, 0.0, z_planePosition };						//intersection point at XZ plane, y coordinate is set to 0.0
-					pt3d tangPt = tangentCrd(workingDets.at(posPlane::XZ).at(0)._isoCylinder, line_, true);		//tangence point coordinate
-					pt3d tangPtPerp = tangPt;													//projection of tangence point to z_planePosition 
-					tangPtPerp.z = z_planePosition;												//so we can build the normal from tangPT to z_planePosition and build a triangle (tangPt, tangPtPerp, intersectPt)
-					double incidnceAngle = getIncidenceAngle(intersectPt, tangPt, tangPtPerp);	//trajectory projection incidence angle is found as ASIN[(tangence line)/(perpendicular)] 
-
-					bool noIntersectWithNonActiveDets = false;									//here we check if the found trajectory does not cross the cylinders of non-active detectors
-					for (size_t item = 0; item < 4; item++) {
-						if (detArray.at(item).isHit()) continue;								//we skip intesection with active detector, as they are obviously hit
-						noIntersectWithNonActiveDets = false;
-						if (isnan(tangentCrd(detArray.at(item)._isoCylinder, line_, false).z))	//if common point coordinates for the line and non-active detector are {NAN, NAN}
-						{
-							noIntersectWithNonActiveDets = true;								//there is no intersection between our line and detector cylinder, we can check next detector
-						}
-						else break;																//else it crosses the cylinder, and we have to break the cycle
-					}
-					if (noIntersectWithNonActiveDets) {
-						intersectionPoints[posPlane::XZ].push_back(intersectPt);				//all legit points are stored in vector corresponding to the detector working plane
-					}
-				}
-			}
+		case 1:
+		{
+			GetIntersectionPoint_case1(detArray, posPlane::XZ, workingDets,
+				intersectionPoints, z_planePosition);
+			break;
+		}
+		case 2:
+		{
+			GetIntersectionPoint_case2(detArray, posPlane::XZ, workingDets,
+				intersectionPoints, z_planePosition);
+			break;
+		}
 		}
 	}
-	if (workingDets.at(posPlane::YZ).size() > 0) {
+	else if (workingDets[posPlane::XZ].size() == 0) {
+		intersectionPoints[posPlane::XZ].push_back({ NAN, NAN, z_planePosition });
+	}
+
+	if (workingDets[posPlane::YZ].size() > 0) {
 		switch (workingDets.at(posPlane::YZ).size()) {
-			case 1:
-			{
-
-			}
-			case 2:
-			{
-				vector<line> tangLines1 = tangents(workingDets.at(posPlane::YZ).at(0)._isoCylinder, workingDets.at(posPlane::YZ).at(1)._isoCylinder);
-				for (line& line_ : tangLines1) {
-
-					double y_intersect = -(line_.b * z_planePosition + line_.c) / line_.a;
-					pt3d intersectPt{ 0.0, y_intersect, z_planePosition };
-					pt3d tangPt = tangentCrd(workingDets.at(posPlane::YZ).at(0)._isoCylinder, line_, true);
-					pt3d tangPtPerp = tangPt;
-					double incidnceAngle = getIncidenceAngle(intersectPt, tangPt, tangPtPerp);
-
-					bool noIntersectWithNonActiveDets = false;
-					for (size_t item = 4; item < 8; item++) {
-						if (detArray.at(item).isHit()) continue;
-						noIntersectWithNonActiveDets = false;
-						if (isnan(tangentCrd(detArray.at(item)._isoCylinder, line_, false).z))
-						{
-							noIntersectWithNonActiveDets = true;
-						}
-						else break;
-					}
-					if (noIntersectWithNonActiveDets) {
-						intersectionPoints[posPlane::YZ].push_back(intersectPt);
-					}
-				}
-			}
+		case 1:
+		{
+			GetIntersectionPoint_case1(detArray, posPlane::YZ, workingDets,
+				intersectionPoints, z_planePosition);
+			break;
 		}
+		case 2:
+		{
+			GetIntersectionPoint_case2(detArray, posPlane::YZ, workingDets,
+				intersectionPoints, z_planePosition);
+			break;
+		}
+		}
+	}
+	else if (workingDets[posPlane::YZ].size() == 0) {
+		intersectionPoints[posPlane::YZ].push_back({ NAN, NAN, z_planePosition });
 	}
 	//get coordinates of hit points at the plane between XZ and YZ detectors
 	for (auto& itemXZ : intersectionPoints.at(posPlane::XZ)) {
@@ -369,35 +421,4 @@ vector<pt3d> GetHitPointsByLines(std::vector<Detector>& detArray) {
 	}
 
 	return hitPoints;
-}
-
-void GetWorkingDetectors(uint8_t word) {
-	if (((std::bitset<8>)(~word & 0b1111'0000)).count() == 4) {
-
-	}
-	if (((std::bitset<8>)(~word & 0b0000'1111)).count() == 4) {
-
-	}
-	//if (((std::bitset<8>)(word & 0b0000)).count() > 0) {
-		std::cout << ((std::bitset<8>)(~word)) << " " <<
-			((std::bitset<8>)(0b1111'0000)) << " "
-			<< ((std::bitset<8>)(~word & 0b1111'0000)).count()
-			<< " "
-			<< ((std::bitset<8>)(~word & 0b0000'1111)).count() << std::endl;
-	//}
-
-	for (size_t i = 0b1100'0000; i >= 0b0000'0010; i >>= 0b0000'0010) {
-		//if 4 in row are without hit, skip
-
-		if ((((std::bitset<8>)(word & i)).count()) != 1) {
-			if (randNum()) {
-				std::cout << ((std::bitset<8>)(i & (i << 0b0000'0001))) << std::endl;
-			}
-			else {
-				std::cout << ((std::bitset<8>)(i & (i >> 0b0000'0001))) << std::endl;
-			}
-		}
-		std::cout << (std::bitset<8>)word << " "
-			<< (std::bitset<8>)i << " " << ((std::bitset<8>)(word & i)).count() << " " << randNum() << std::endl;
-	}
 }
