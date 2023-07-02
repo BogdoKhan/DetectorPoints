@@ -40,3 +40,9 @@ Detector::Detector(std::string emplacement, bool isHit) :
 };
 
 bool Detector::isHit() const { return _isHit; }
+
+bool operator< (const Detector& lhs, const Detector& rhs) {
+	if (lhs._isoCylinder.crd1 < rhs._isoCylinder.crd1) return true;
+	if (lhs._isoCylinder.orientation < rhs._isoCylinder.orientation) return true;
+	else return false;
+}

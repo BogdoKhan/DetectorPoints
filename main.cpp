@@ -7,7 +7,7 @@
 int main() {
 	//std::vector<double> isochrones = {4.2, 0.0, 2.4, 0.0, 3.2, 0.0, 1.6, 0.0};
 	//std::vector<double> isochrones = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-	std::vector<double> isochrones = { 4.2, 0.0, 2.4, 0.0, 3.2, 0.0, 1.6, 0.0 };
+	std::vector<double> isochrones = { 0.0, 0.0, 0.0, 3.2, 3.2, 0.0, 1.6, 0.0 };
 	std::vector<Detector> detArray;
 
 	GetDetectorHitData(isochrones, detArray, 5.0);
