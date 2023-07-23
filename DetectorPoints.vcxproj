@@ -127,9 +127,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Detector.cpp" />
     <ClCompile Include="etc.cpp" />
+    <ClCompile Include="GSL_Solvers.cpp" />
     <ClCompile Include="HitData.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="RandGen.cpp" />
+    <ClCompile Include="Tangents.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Detector.h" />

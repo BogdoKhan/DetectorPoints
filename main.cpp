@@ -3,11 +3,16 @@
 
 #include "HitData.h"
 
+//TODO: move the solver output and add info about the created lines, circles, planes, points into the log files
+//only required info (hit points +- uncertainty) must be pushed to the cout
+
+//add visualization? for example, add function that fills in the gnuplot script, so you can execute it
+//all geometrical primitives may be presented as the set of points
 
 int main() {
 	//std::vector<double> isochrones = {4.2, 0.0, 2.4, 0.0, 3.2, 0.0, 1.6, 0.0};
 	//std::vector<double> isochrones = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-	std::vector<double> isochrones = { 0.0, 0.0, 0.0, 0.0, 3.2, 0.0, 1.6, 0.0 };
+	std::vector<double> isochrones = { 3.1, 0.0, 2.1, 0.0, 3.2, 0.0, 1.6, 0.0 };
 	std::vector<Detector> detArray;
 	std::vector<pt3d> hitPointsByLines = {};
 	std::vector<pt3d> hitPointsUncert = {};
