@@ -40,13 +40,18 @@ double getIncidenceAngle(const pt3d& intersectPt, const pt3d& tangPt, const pt3d
 
 void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const posPlane& planePosition,
 	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
-	const double& z_planePosition);
+	map<posPlane, vector<pt3d>>& intersectionPointsUnc, const double& z_planePosition, const double& thresholdAngle);
 
 void GetIntersectionPoint_case2(const std::vector<Detector>& detArray, const posPlane& planePosition,
 	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
-	const double& z_planePosition);
+	map<posPlane, vector<pt3d>>& intersectionPointsUnc, const double& z_planePosition);
 
-vector<pt3d> GetHitPointsByLines(std::vector<Detector>& detArray);
+void GetIntersectionPoint_Multi(const std::vector<Detector>& detArray, const posPlane& planePosition,
+	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
+	map<posPlane, vector<pt3d>>& intersectionPointsUnc, const double& z_planePosition);
+
+void GetHitPointsByLines(std::vector<Detector>& detArray, const double& thresholdAngle, vector<pt3d>& hitPoints,
+	vector<pt3d>& hitPointsUncert);
 
 
 pt tangentCrd(const double& _x1, const double& _y1, const double& _r1,
@@ -241,6 +246,14 @@ double geomVectorLength(const pt3d& pt1, const pt3d& pt2) {
 	return sqrt(gsl_pow_2(pt2.x - pt1.x) + gsl_pow_2(pt2.y - pt1.y) + gsl_pow_2(pt2.z - pt1.z));
 }
 
+double getAngleInRadians(const double& angle) {
+	return angle * PI / 180;
+}
+
+double getAngleInDegrees(const double& angle) {
+	return angle * 180 / PI;
+}
+
 double getIncidenceAngle(const pt3d& intersectPt, const pt3d& tangPt, const pt3d& tangPtPerp) {
 	double tangentLength = geomVectorLength(tangPt, intersectPt);
 	double tangPerpLength = geomVectorLength(tangPt, tangPtPerp);
@@ -249,21 +262,125 @@ double getIncidenceAngle(const pt3d& intersectPt, const pt3d& tangPt, const pt3d
 	return incidenceAngle;
 }
 
+//this recalculates the tangent line and corresponding points for the lines that incident at unrealistic angles
+//a new tangent line is built according to the chosen threshold angle value
+void RecalcTangLineWithAngle(const double& incidenceAngle, const double& thresholdAngle, const posPlane& planePosition,
+	const map<posPlane, vector<Detector>>& workingDets, const double& R, const double& z_planePosition, pt3d& tangPt,
+	pt3d& tangPtPerp, pt3d& intersectPt, line& line_) {
+
+	double zPt = std::fabs((tangPt.z - z_planePosition));
+	double z0 =
+		std::fabs(workingDets.at(planePosition).at(0)._isoCylinder.z - z_planePosition);
+
+
+	if (planePosition == posPlane::XZ) {
+		double x0 = workingDets.at(planePosition).at(0)._isoCylinder.x;
+
+		double perpAB = R * std::cos(getAngleInRadians(thresholdAngle));
+		double parOB = R * std::sin(getAngleInRadians(thresholdAngle));
+
+		double XperpLen = 0;
+		double ZparLen = 0;
+		double XinterLen = 0;
+
+		if (tangPt.x < x0) {						//if x < x0
+			if (zPt > z0) {							//if z > z0
+				ZparLen = z0 + perpAB;
+				XperpLen = x0 - parOB;
+				XinterLen = XperpLen - ZparLen / std::tan(getAngleInRadians(thresholdAngle));
+			}
+			else {
+				ZparLen = z0 - perpAB;
+				XperpLen = x0 - parOB;
+				XinterLen = XperpLen + ZparLen / std::tan(getAngleInRadians(thresholdAngle));
+			}
+		}
+		else {
+			if (zPt > z0) {
+				ZparLen = z0 + perpAB;
+				XperpLen = x0 + parOB;
+				XinterLen = XperpLen + ZparLen / std::tan(getAngleInRadians(thresholdAngle));
+			}
+			else {
+				ZparLen = z0 - perpAB;
+				XperpLen = x0 + parOB;
+				XinterLen = XperpLen - ZparLen / std::tan(getAngleInRadians(thresholdAngle));
+			}
+		}
+		tangPtPerp = { XperpLen, 0.0, z_planePosition };
+		tangPt = { XperpLen, 0.0, (z_planePosition - ZparLen) };
+		intersectPt = { XinterLen, 0.0, z_planePosition };
+
+		line_ = {
+			tangPt.z - intersectPt.z,
+			intersectPt.x - tangPt.x,
+			-(intersectPt.x * (tangPt.z - intersectPt.z) +
+			intersectPt.z * (intersectPt.x - tangPt.x))
+		};
+	}
+
+	else if (planePosition == posPlane::YZ) {
+		double y0 = workingDets.at(planePosition).at(0)._isoCylinder.y;
+
+		double perpAB = R * std::cos(getAngleInRadians(thresholdAngle));
+		double parOB = R * std::sin(getAngleInRadians(thresholdAngle));
+
+		double YperpLen = 0;
+		double ZparLen = 0;
+		double YinterLen = 0;
+
+		if (tangPt.y < y0) {						//if y < y0
+			if (zPt > z0) {							//if z > z0
+				ZparLen = z0 + perpAB;
+				YperpLen = y0 - parOB;
+				YinterLen = YperpLen - ZparLen / std::tan(getAngleInRadians(thresholdAngle));
+			}
+			else {
+				ZparLen = z0 - perpAB;
+				YperpLen = y0 - parOB;
+				YinterLen = YperpLen + ZparLen / std::tan(getAngleInRadians(thresholdAngle));
+			}
+		}
+		else {
+			if (zPt > z0) {
+				ZparLen = z0 + perpAB;
+				YperpLen = y0 + parOB;
+				YinterLen = YperpLen + ZparLen / std::tan(getAngleInRadians(thresholdAngle));
+			}
+			else {
+				ZparLen = z0 - perpAB;
+				YperpLen = y0 + parOB;
+				YinterLen = YperpLen - ZparLen / std::tan(getAngleInRadians(thresholdAngle));
+			}
+		}
+		tangPtPerp = { 0.0, YperpLen, z_planePosition };
+		tangPt = { 0.0, YperpLen, (z_planePosition + ZparLen) };
+		intersectPt = { 0.0, YinterLen, z_planePosition };
+
+		line_ = {
+			tangPt.z - intersectPt.z,
+			intersectPt.y - tangPt.y,
+			-(intersectPt.y * (tangPt.z - intersectPt.z) +
+			intersectPt.z * (intersectPt.y - tangPt.y))
+		};
+	}
+
+}
+
 void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const posPlane& planePosition,
 	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
-	const double& z_planePosition) {
+	map<posPlane, vector<pt3d>>& intersectionPointsUnc, const double& z_planePosition, const double& thresholdAngle) {
 	size_t i_start = 0;
 	if (planePosition == posPlane::XZ) i_start = 0;
 	else if (planePosition == posPlane::YZ) i_start = 4;
 	size_t i_end = i_start + 4;
 
-	double thresholdAngle = 30.0;
-
 	map<size_t, vector<line>> tangentLines;
 	map<posPlane, vector<pt3d>> tangencyPt;
 	map<posPlane, vector<pt3d>> intersectionPtCandidates;
 	for (size_t i = i_start; i < i_end; i++) {
-		if (detArray.at(i).isHit()) {
+		if (detArray.at(i).isHit() &&
+			detArray.at(i)._isoCylinder.x == workingDets.at(planePosition).at(0)._isoCylinder.x) {
 			tangentLines[i] = {};						//skips the calculation for the only detector hit, we use it as anchor to find tangents to non-active detectors
 			continue;
 		}
@@ -279,13 +396,18 @@ void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const pos
 				pt3d tangPtPerp = tangPt;
 				tangPtPerp.z = z_planePosition;															//point coming from tangence point perpendicular to Z plane
 				double incidenceAngle = getIncidenceAngle(intersectPt, tangPt, tangPtPerp);				//calculate angle of incidence wrt Z axis
-				
-				if (incidenceAngle < thresholdAngle) continue;
-				//place here the implementation for the line tangent @ specified angle
+				double R = workingDets.at(planePosition).at(0)._isoCylinder.r;
+
+				if (incidenceAngle < thresholdAngle) 
+				{
+					RecalcTangLineWithAngle(incidenceAngle,thresholdAngle, planePosition, workingDets, R, 
+						z_planePosition, tangPt, tangPtPerp,intersectPt, line_);
+				}
 
 				bool noIntersectWithNonActiveDets = false;												//flag: if the tangent intersects any non-hit detector, which it is not tangent to, reject the line
 				for (size_t item = i_start; item < i_end; item++) {
-					if (detArray.at(item).isHit() || item == i) continue;								//skip if crosses the pair of detectors to which it is tangent
+					if (detArray.at(item).isHit() ||													//for detectors where tangence line was recalculated, do not skip check of intersection with this detector
+						((incidenceAngle >= thresholdAngle) && (item == i))) continue;					//skip if crosses the pair of detectors to which it is tangent
 					noIntersectWithNonActiveDets = false;
 					if (isnan(tangentCrd(detArray.at(item)._isoCylinder, line_, false).z))				//if no intersections with non-hit detector were found, the line is OK
 					{
@@ -295,8 +417,7 @@ void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const pos
 				}
 				if (noIntersectWithNonActiveDets) {
 					//intersectionPoints[planePosition].push_back(intersectPt);							//if line is OK, add to the intersection points
-
-					intersectionPtCandidates[planePosition].push_back(intersectPt);
+ 					intersectionPtCandidates[planePosition].push_back(intersectPt);
 					tangencyPt[planePosition].push_back(tangPt);
 
 				}
@@ -304,11 +425,19 @@ void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const pos
 
 		}
 	}
-
-
-	double workingDetX = workingDets.at(posPlane::XZ).at(0)._isoCylinder.x;
-	double workingDetY = workingDets.at(posPlane::YZ).at(0)._isoCylinder.y;
+	//central point position calculation
+	double workingDetX = 0.0;
+	double workingDetY = 0.0;
 	double intersectPtCenter = 0.0;
+	double intersectPtUnc = 0.0;
+
+	if (workingDets.at(posPlane::XZ).size() > 0) {
+		workingDetX = workingDets.at(posPlane::XZ).at(0)._isoCylinder.x;
+	}
+	if (workingDets.at(posPlane::YZ).size() > 0) {
+		workingDetY = workingDets.at(posPlane::YZ).at(0)._isoCylinder.y;
+	}
+
 	for (const pair<posPlane, vector<pt3d>>& det : tangencyPt) {
 		if (intersectionPtCandidates[planePosition].size() == 1) {
 			intersectionPoints[planePosition] = intersectionPtCandidates[planePosition];
@@ -316,8 +445,10 @@ void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const pos
 		else {
 			for (size_t i = 0; i < det.second.size(); i++) {
 				for (size_t j = i; j < det.second.size(); j++) {
-
+					double R = workingDets.at(planePosition).at(0)._isoCylinder.r;
 					if (i == j) continue;
+					if (std::fabs(det.second.at(i).x - workingDetX) > R ||			//for case of 2 working detectors in the same layer, skip if points 
+						std::fabs(det.second.at(j).x - workingDetX) > R) continue;	//do not belong to the current working detector
 
 					if (det.first == posPlane::XZ) {
 						bool lhsTangents = ((det.second.at(i).x < workingDetX) &&
@@ -326,7 +457,9 @@ void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const pos
 							(det.second.at(j).x > workingDetX));
 						if (lhsTangents || rhsTangents) {
 							intersectPtCenter = (intersectionPtCandidates.at(det.first).at(i).x + intersectionPtCandidates.at(det.first).at(j).x) / 2;
+							intersectPtUnc = std::fabs(intersectPtCenter - intersectionPtCandidates.at(det.first).at(i).x);
 							intersectionPoints[posPlane::XZ].push_back({ intersectPtCenter, 0.0, z_planePosition });
+							intersectionPointsUnc[posPlane::XZ].push_back({ intersectPtUnc, 0.0, (R / sqrt(12))});
 						}
 						else continue;
 					}
@@ -338,7 +471,10 @@ void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const pos
 							(det.second.at(j).y > workingDetY));
 						if (lhsTangents || rhsTangents) {
 							intersectPtCenter = (intersectionPtCandidates.at(det.first).at(i).y + intersectionPtCandidates.at(det.first).at(j).y) / 2;
+							intersectPtUnc = std::fabs(intersectPtCenter - intersectionPtCandidates.at(det.first).at(i).y);
 							intersectionPoints[posPlane::YZ].push_back({ 0.0, intersectPtCenter, z_planePosition });
+							intersectionPointsUnc[posPlane::YZ].push_back({ 0.0, intersectPtUnc, (R / sqrt(12)) });
+
 						}
 						else continue;
 					}
@@ -348,16 +484,17 @@ void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const pos
 
 		}
 	}
-
+	//end of central point position calculation
 }
 
 void GetIntersectionPoint_case2(const std::vector<Detector>& detArray, const posPlane& planePosition,
 	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
-	const double& z_planePosition) {
+	map<posPlane, vector<pt3d>>& intersectionPointsUnc, const double& z_planePosition) {
 	size_t i_start = 0;
 	if (planePosition == posPlane::XZ) i_start = 0;
 	else if (planePosition == posPlane::YZ) i_start = 4;
 	size_t i_end = i_start + 4;
+	double R = workingDets.at(planePosition).at(0)._isoCylinder.r;
 
 	vector<line> tangLines1 = tangents(workingDets.at(planePosition).at(0)._isoCylinder,
 		workingDets.at(planePosition).at(1)._isoCylinder);
@@ -384,14 +521,88 @@ void GetIntersectionPoint_case2(const std::vector<Detector>& detArray, const pos
 		}
 		if (noIntersectWithNonActiveDets) {
 			intersectionPoints[planePosition].push_back(intersectPt);				//all legit points are stored in vector corresponding to the detector working plane
+			if (planePosition == posPlane::XZ) {
+				intersectionPointsUnc[planePosition].push_back({ (R / sqrt(12)), 0.0, (R / sqrt(12)) });
+			}
+			else if (planePosition == posPlane::YZ) {
+				intersectionPointsUnc[planePosition].push_back({ 0.0, (R / sqrt(12)), (R / sqrt(12)) });
+			}
 		}
 	}
 }
 
-vector<pt3d> GetHitPointsByLines(std::vector<Detector>& detArray) {
-	vector<pt3d> hitPoints = {};
+void GetIntersectionPoint_Multi(const std::vector<Detector>& detArray, const posPlane& planePosition,
+	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
+	map<posPlane, vector<pt3d>>& intersectionPointsUnc, const double& z_planePosition) {
+	size_t i_start = 0;
+	if (planePosition == posPlane::XZ) i_start = 0;
+	else if (planePosition == posPlane::YZ) i_start = 4;
+	size_t i_end = i_start + 4;
+	double R = workingDets.at(planePosition).at(0)._isoCylinder.r;
+
+
+	vector<line> tangLines1 = {};
+	for (size_t i = 0; i < workingDets.at(planePosition).size(); i++) {
+		for (size_t item = i; item < workingDets.at(planePosition).size(); item++) {
+			if (i == item) continue;
+			if (workingDets.at(planePosition).at(i)._isoCylinder.z ==
+				workingDets.at(planePosition).at(item)._isoCylinder.z) continue;
+
+			else {
+				tangLines1 = tangents(workingDets.at(planePosition).at(i)._isoCylinder,
+					workingDets.at(planePosition).at(item)._isoCylinder);
+
+
+				for (line& line_ : tangLines1) {
+					//f(crd): a*crd + b*z +c == 0
+					double intersect_crd = -(line_.b * z_planePosition + line_.c) / line_.a;		//required coordinate of the intersection point between tangent line and specific line at z_planePosition (@XZ plane)
+					pt3d intersectPt{ 0.0, 0.0, z_planePosition };
+					if (planePosition == posPlane::XZ) intersectPt.x = intersect_crd;
+					else if (planePosition == posPlane::YZ) intersectPt.y = intersect_crd;			//intersection point at XZ plane, y coordinate is set to 0.0
+					pt3d tangPt = tangentCrd(workingDets.at(planePosition).at(0)._isoCylinder, line_, true);//tangence point coordinate
+					pt3d tangPtPerp = tangPt;													//projection of tangence point to z_planePosition 
+					tangPtPerp.z = z_planePosition;												//so we can build the normal from tangPT to z_planePosition and build a triangle (tangPt, tangPtPerp, intersectPt)
+					double incidenceAngle = getIncidenceAngle(intersectPt, tangPt, tangPtPerp);	//trajectory projection incidence angle is found as ASIN[(tangence line)/(perpendicular)] 
+
+					bool noIntersectWithNonActiveDets = false;									//here we check if the found trajectory does not cross the cylinders of non-active detectors
+					for (size_t item = i_start; item < i_end; item++) {
+						if (detArray.at(item).isHit()) continue;								//we skip intersection with active detectors, as they are obviously hit
+						noIntersectWithNonActiveDets = false;
+						if (isnan(tangentCrd(detArray.at(item)._isoCylinder, line_, false).z))	//if common point coordinates for the line and non-active detector are {NAN, NAN}
+						{
+							noIntersectWithNonActiveDets = true;								//there is no intersection between our line and detector cylinder, we can check next detector
+						}
+						else break;																//else it crosses the cylinder, and we have to break the cycle
+					}
+
+					if (workingDets.at(planePosition).size() == 4) noIntersectWithNonActiveDets = true; //all detectors in the layers are active
+
+					if (noIntersectWithNonActiveDets) {
+						intersectionPoints[planePosition].push_back(intersectPt);				//all legit points are stored in vector corresponding to the detector working plane
+						if (planePosition == posPlane::XZ) {
+							intersectionPointsUnc[planePosition].push_back({ (R / sqrt(12)), 0.0, (R / sqrt(12)) });
+						}
+						else if (planePosition == posPlane::YZ) {
+							intersectionPointsUnc[planePosition].push_back({ 0.0, (R / sqrt(12)), (R / sqrt(12)) });
+						}
+
+					}
+				}
+
+			}
+
+		}
+	}
+
+}
+
+void GetHitPointsByLines(std::vector<Detector>& detArray, const double& thresholdAngle, vector<pt3d>& hitPoints,
+								vector<pt3d>& hitPointsUncert) {
+	hitPoints = {};
 	map<posPlane, vector<Detector>> workingDets = { {posPlane::XZ, {}}, {posPlane::YZ, {}} };
-	map<posPlane, vector<pt3d>> intersectionPoints;
+	map<posPlane, vector<pt3d>> intersectionPoints = { {posPlane::XZ, {}}, {posPlane::YZ, {}} };
+	map<posPlane, vector<pt3d>> intersectionPointsUnc = { {posPlane::XZ, {}}, {posPlane::YZ, {}} };
+
 	double z_planePosition = detArray.at(0).DetectorRadius * (1 + 2 * cos(30 * PI / 180)); //R + 2Rcos(30*) is the position of plane dividing XZ and YZ detectors
 	//define working detectors
 	for (const Detector& det : detArray) {
@@ -403,18 +614,38 @@ vector<pt3d> GetHitPointsByLines(std::vector<Detector>& detArray) {
 			case 1:
 			{
 				GetIntersectionPoint_case1(detArray, posPlane::XZ, workingDets,
-					intersectionPoints, z_planePosition);
+					intersectionPoints, intersectionPointsUnc, z_planePosition, thresholdAngle);
 				break;
 			}
 			case 2:
 			{
-				GetIntersectionPoint_case2(detArray, posPlane::XZ, workingDets,
-					intersectionPoints, z_planePosition);
+				//check if 2 workind detectors are in the same layer
+				if (workingDets.at(posPlane::XZ).at(0)._isoCylinder.z ==
+					workingDets.at(posPlane::XZ).at(1)._isoCylinder.z) {
+					map<posPlane, vector<Detector>> workingDetsSameLayer = workingDets;
+					workingDetsSameLayer.at(posPlane::XZ).clear();
+					workingDetsSameLayer.at(posPlane::XZ).push_back(workingDets.at(posPlane::XZ).at(0));
+					GetIntersectionPoint_case1(detArray, posPlane::XZ, workingDetsSameLayer,
+						intersectionPoints, intersectionPointsUnc, z_planePosition, thresholdAngle );
+
+					workingDetsSameLayer.at(posPlane::XZ).clear();
+					workingDetsSameLayer.at(posPlane::XZ).push_back(workingDets.at(posPlane::XZ).at(1));
+					GetIntersectionPoint_case1(detArray, posPlane::XZ, workingDetsSameLayer,
+						intersectionPoints, intersectionPointsUnc, z_planePosition, thresholdAngle);
+				}
+				else {
+					GetIntersectionPoint_case2(detArray, posPlane::XZ, workingDets,
+						intersectionPoints, intersectionPointsUnc, z_planePosition);
+				}
 				break;
+			}
+			default: {
+				GetIntersectionPoint_Multi(detArray, posPlane::XZ, workingDets,
+					intersectionPoints, intersectionPointsUnc, z_planePosition);
 			}
 		}
 	}
-	else if (workingDets[posPlane::XZ].size() == 0) {
+	if (workingDets[posPlane::XZ].size() == 0 || intersectionPoints[posPlane::XZ].size() == 0) {
 		intersectionPoints[posPlane::XZ].push_back({ NAN, NAN, z_planePosition });
 	}
 
@@ -423,84 +654,60 @@ vector<pt3d> GetHitPointsByLines(std::vector<Detector>& detArray) {
 			case 1:
 			{
 				GetIntersectionPoint_case1(detArray, posPlane::YZ, workingDets,
-					intersectionPoints, z_planePosition);
+					intersectionPoints, intersectionPointsUnc, z_planePosition, thresholdAngle);
 				break;
 			}
 			case 2:
 			{
+				//check if 2 workind detectors are in the same layer
+				if (workingDets.at(posPlane::YZ).at(0)._isoCylinder.z ==
+					workingDets.at(posPlane::YZ).at(1)._isoCylinder.z) {
+					map<posPlane, vector<Detector>> workingDetsSameLayer = workingDets;
+					workingDetsSameLayer.at(posPlane::YZ).clear();
+					workingDetsSameLayer.at(posPlane::YZ).push_back(workingDets.at(posPlane::YZ).at(0));
+					GetIntersectionPoint_case1(detArray, posPlane::YZ, workingDetsSameLayer,
+						intersectionPoints, intersectionPointsUnc, z_planePosition, thresholdAngle);
+
+					workingDetsSameLayer.at(posPlane::YZ).clear();
+					workingDetsSameLayer.at(posPlane::YZ).push_back(workingDets.at(posPlane::YZ).at(1));
+					GetIntersectionPoint_case1(detArray, posPlane::YZ, workingDetsSameLayer,
+						intersectionPoints, intersectionPointsUnc, z_planePosition, thresholdAngle);
+				}
 				GetIntersectionPoint_case2(detArray, posPlane::YZ, workingDets,
-					intersectionPoints, z_planePosition);
+					intersectionPoints, intersectionPointsUnc, z_planePosition);
 				break;
+			}
+			default: {
+				GetIntersectionPoint_Multi(detArray, posPlane::YZ, workingDets,
+					intersectionPoints, intersectionPointsUnc, z_planePosition);
 			}
 		}
 	}
-	else if (workingDets[posPlane::YZ].size() == 0) {
+	if (workingDets[posPlane::YZ].size() == 0 || intersectionPoints[posPlane::YZ].size() == 0) {
 		intersectionPoints[posPlane::YZ].push_back({ NAN, NAN, z_planePosition });
 	}
+
+	if (workingDets[posPlane::XZ].size() == 0 &&
+		workingDets[posPlane::YZ].size() == 0) {
+		hitPoints = {};
+		hitPointsUncert = {};
+		return;
+	}
+
 	//get coordinates of hit points at the plane between XZ and YZ detectors
 	for (auto& itemXZ : intersectionPoints.at(posPlane::XZ)) {
 		for (auto& itemYZ : intersectionPoints.at(posPlane::YZ)) {
 			hitPoints.push_back({ itemXZ.x, itemYZ.y, itemXZ.z });
 		}
 	}
+	if (intersectionPointsUnc.at(posPlane::XZ).size() > 0 &&						//TODO: change for case of defined uncertainties in 1 layer
+		intersectionPointsUnc.at(posPlane::YZ).size() > 0) {
+		for (auto& itemXZ : intersectionPointsUnc.at(posPlane::XZ)) {
+			for (auto& itemYZ : intersectionPointsUnc.at(posPlane::YZ)) {
+				hitPointsUncert.push_back({ itemXZ.x, itemYZ.y, itemXZ.z });
+			}
+		}
+	}
 
-	return hitPoints;
+	return ;
 }
-
-
-//----------------------------------TODO:
-//this part is responsible for the calcualtion of line tangent to circle
-//at the specified threshold angle
-
-//if (incidenceAngle < thresholdAngle) {			//reject the line with unrealistic incidence angle
-//	double central_z = workingDets.at(planePosition).at(0)._isoCylinder.z;
-//	double R = workingDets.at(planePosition).at(0)._isoCylinder.r;
-//	double perp_a = R * sin((90 - thresholdAngle) / 180.0 * PI);
-//	double parall_b = R * cos((90 - thresholdAngle) / 180.0 * PI);
-//	double perp_d = perp_a + (z_planePosition - central_z);
-//	double parall_f = perp_d / tan((thresholdAngle) / 180.0 * PI);
-//	double parall_g = parall_b;
-// 
-//	//add case for +thrAngle and -thrAngle!
-//	//lower: (z_planePosition - central_z + perp_a)
-
-//	if (planePosition == posPlane::XZ) {
-//		double central_crd = workingDets.at(planePosition).at(0)._isoCylinder.x;
-//		if (tangPt.x < central_crd) {
-//			tangPtPerp = { (central_crd - parall_g), 0.0, z_planePosition };
-//			tangPt = { (central_crd - parall_g), 0.0, (z_planePosition - perp_d) };
-//			intersectPt = { (central_crd - (parall_f + parall_g)), 0.0, z_planePosition };
-//		}
-//		else {
-//			tangPtPerp = { (central_crd + parall_g), 0.0, z_planePosition };
-//			tangPt = { (central_crd + parall_g), 0.0, (z_planePosition - perp_d) };
-//			intersectPt = { (central_crd + (parall_f + parall_g)), 0.0, z_planePosition };
-//		}
-//		line_ = {
-//			tangPt.z - intersectPt.z,
-//			intersectPt.x - tangPt.x,
-//			-(intersectPt.x * (tangPt.z - intersectPt.z) +
-//			intersectPt.z * (intersectPt.x - tangPt.x))
-//		};
-//	}
-//	else if (planePosition == posPlane::YZ) {
-//		double central_crd = workingDets.at(planePosition).at(0)._isoCylinder.y;
-//		if (tangPt.y < central_crd) {
-//			tangPtPerp = { 0.0, (central_crd - parall_g), z_planePosition };
-//			tangPt = { 0.0, (central_crd - parall_g), (z_planePosition + (perp_a + R)) };
-//			intersectPt = { 0.0, (central_crd - (parall_f + parall_g)), z_planePosition };
-//		}
-//		else {
-//			tangPtPerp = { 0.0, (central_crd + parall_g), z_planePosition };
-//			tangPt = { 0.0, (central_crd + parall_g), (z_planePosition + (perp_a + R)) };
-//			intersectPt = { 0.0, (central_crd + (parall_f + parall_g)), z_planePosition };
-//		}
-//		line_ = {
-//			tangPt.z - intersectPt.z,
-//			intersectPt.y - tangPt.y,
-//			-(intersectPt.y * (tangPt.z - intersectPt.z) +
-//			intersectPt.z * (intersectPt.y - tangPt.y))
-//		};
-//	}
-//}
-//
