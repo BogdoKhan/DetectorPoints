@@ -70,3 +70,5 @@ struct plane {
 std::ostream& operator<< (std::ostream& out, const plane& pp);
 
 std::ostream& operator<< (std::ostream& out, const pt3d& pt);
+
+std::ostream& PrintTangentLine(std::ostream& out, const line& line, const cylinder& cyl);

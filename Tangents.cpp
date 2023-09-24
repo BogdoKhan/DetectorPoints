@@ -1,4 +1,5 @@
 #include "Tangents.h"
+#include "Logger.h"
 
 pt pt::operator- (pt p) {
 	pt res = { crd1 - p.crd1, crd2 - p.crd2 };
@@ -85,6 +86,7 @@ vector<line> tangents(cylinder cyl1, cylinder cyl2) {
 	circle a = circle(cyl1.crd1, cyl1.crd2, cyl1.r);
 	circle b = circle(cyl2.crd1, cyl2.crd2, cyl2.r);
 	vector<line> ans = tangents(a, b);
+
 	return ans;
 }
 
@@ -97,7 +99,25 @@ std::ostream& operator<< (std::ostream& out, const plane& pp) {
 }
 
 std::ostream& operator<< (std::ostream& out, const pt3d& pt) {
-	out << "point at cooridnates: {" << pt.x;
+	out << "Point at cooridnates: {" << pt.x;
 	out << ", " << pt.y << ", " << pt.z << "}";
+	return out;
+}
+
+std::ostream& PrintTangentLine (std::ostream& out, const line& line, const cylinder& cyl) {
+
+	if (cyl.orientation == posPlane::XZ) {
+		out << "Line equation: " << line.a;
+		(line.b >= 0) ? out << "x+" : out << "x"; out << line.b;
+		(line.c >= 0) ? out << "z+" : out << "z"; out << line.c;
+		out << " == 0";
+	}
+	else {
+		out << "Line equation: " << line.a;
+		(line.b >= 0) ? out << "y+" : out << "y"; out << line.b;
+		(line.c >= 0) ? out << "z+" : out << "z"; out << line.c;
+		out << " == 0";
+	}
+
 	return out;
 }

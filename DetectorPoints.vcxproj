@@ -131,6 +131,7 @@
     <ClCompile Include="etc.cpp" />
     <ClCompile Include="GSL_Solvers.cpp" />
     <ClCompile Include="HitData.cpp" />
+    <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RandGen.cpp" />
     <ClCompile Include="Tangents.cpp" />
@@ -139,6 +140,7 @@
     <ClInclude Include="Detector.h" />
     <ClInclude Include="GSL_Solvers.h" />
     <ClInclude Include="HitData.h" />
+    <ClInclude Include="Logger.h" />
     <ClInclude Include="RandGen.h" />
     <ClInclude Include="Tangents.h" />
   </ItemGroup>

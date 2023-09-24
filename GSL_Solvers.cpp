@@ -18,15 +18,19 @@ int circleAndLine(const gsl_vector* variables, void* params,
 	return GSL_SUCCESS;
 }
 
-int print_state(size_t iter, gsl_multiroot_fsolver* s)
+int print_state(size_t iter, gsl_multiroot_fsolver* s, std::ostream& out)
 {
-	printf("iter = %3u x = % .6f % .6f "
-		"f(x) = % .6e % .6e\n",
-		iter,
-		gsl_vector_get(s->x, 0),
-		gsl_vector_get(s->x, 1),
-		gsl_vector_get(s->f, 0),
-		gsl_vector_get(s->f, 1));
+	out << "\niter = " << iter << " coord1 (x || y) = " << gsl_vector_get(s->x, 0);
+	out << " coord2 (z) = " << gsl_vector_get(s->x, 1) << "\ncircle f(x) = ";
+	out << gsl_vector_get(s->f, 0) << " line f1(x) " << gsl_vector_get(s->f, 1);
+
+	//printf("iter = %3u x = % .6f % .6f "
+	//	"f(x) = % .6e % .6e\n",
+	//	iter,
+	//	gsl_vector_get(s->x, 0),
+	//	gsl_vector_get(s->x, 1),
+	//	gsl_vector_get(s->f, 0),
+	//	gsl_vector_get(s->f, 1));
 	return 0;
 }
 
@@ -47,15 +51,21 @@ int lineAndPlane(const gsl_vector* variables, void* params,
 	return GSL_SUCCESS;
 }
 
-int print_state_linePl(size_t iter, gsl_multiroot_fsolver* s)
+int print_state_linePl(size_t iter, gsl_multiroot_fsolver* s, std::ostream& out)
 {
-	printf("iter = %3u x = % .6f % .6f "
-		"f(x) = % .6e % .6e\n",
-		iter,
-		gsl_vector_get(s->x, 0),
-		gsl_vector_get(s->x, 1),
-		gsl_vector_get(s->x, 2),
-		gsl_vector_get(s->f, 0),
-		gsl_vector_get(s->f, 1));
+	out << "iter = " << iter << " x = " << gsl_vector_get(s->x, 0);
+	out << " y = " << gsl_vector_get(s->x, 1);
+	out << " z = " << gsl_vector_get(s->x, 2);
+	out << "\nf(x) = " << gsl_vector_get(s->f, 0) << " f1(x) = " << gsl_vector_get(s->f, 1);
+	
+	
+	//printf("iter = %3u x = % .6f % .6f "
+	//	"f(x) = % .6e % .6e\n",
+	//	iter,
+	//	gsl_vector_get(s->x, 0),
+	//	gsl_vector_get(s->x, 1),
+	//	gsl_vector_get(s->x, 2),
+	//	gsl_vector_get(s->f, 0),
+	//	gsl_vector_get(s->f, 1));
 	return 0;
 }

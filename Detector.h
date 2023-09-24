@@ -20,3 +20,5 @@ private:
 	double _centerPosition = 0.0;
 
 };
+
+std::ostream& operator<< (std::ostream& out, const Detector& det);
