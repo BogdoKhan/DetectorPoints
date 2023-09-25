@@ -37,12 +37,18 @@ LogVerbosity& FileLogger::getVerbosity() {
 void BufferDetectorHitsPoints(
 	const std::vector<pt3d>& hitPointsByLines,
 	const std::vector<pt3d>& hitPointsUncert,
+	const std::vector<pt3d>& directionVectors,
 	size_t counter,
 	ostream& ss){
 	for (size_t i = 0; i < hitPointsByLines.size(); i++) {
 		ss << "No. " << counter << " " << hitPointsByLines.at(i) << endl;
 		if (hitPointsUncert.size() > 0) {
 			ss << "Uncert +-" << hitPointsUncert.at(i) << endl;
+		}
+		if (directionVectors.size() > 0 && (directionVectors.size() == hitPointsByLines.size())) {
+			ss << "Direction vector: { "
+				<< directionVectors.at(i).x << ", " << directionVectors.at(i).y
+				<< ", " << directionVectors.at(i).z << " }\n";
 		}
 		ss << "--------------------------------------------------------------\n";
 		counter++;

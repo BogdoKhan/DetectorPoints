@@ -49,17 +49,20 @@ void RecalcTangLineWithAngle(const double& incidenceAngle, const double& thresho
 
 void GetIntersectionPoint_case1(const std::vector<Detector>& detArray, const posPlane& planePosition,
 	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
-	map<posPlane, vector<pt3d>>& intersectionPointsUnc, const double& z_planePosition, const double& thresholdAngle, FileLogger& logger);
+	map<posPlane, vector<pt3d>>& intersectionPointsUnc, map<posPlane, vector<pt3d>>& tangencyPoints, 
+	const double& z_planePosition, const double& thresholdAngle, FileLogger& logger);
 
 void GetIntersectionPoint_case2(const std::vector<Detector>& detArray, const posPlane& planePosition,
 	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
-	map<posPlane, vector<pt3d>>& intersectionPointsUnc, const double& z_planePosition, FileLogger& logger);
+	map<posPlane, vector<pt3d>>& intersectionPointsUnc, map<posPlane, vector<pt3d>>& tangencyPoints,
+	const double& z_planePosition, FileLogger& logger);
 
 void GetIntersectionPoint_Multi(const std::vector<Detector>& detArray, const posPlane& planePosition,
 	const map<posPlane, vector<Detector>>& workingDets, map<posPlane, vector<pt3d>>& intersectionPoints,
-	map<posPlane, vector<pt3d>>& intersectionPointsUnc, const double& z_planePosition, FileLogger& logger);
+	map<posPlane, vector<pt3d>>& intersectionPointsUnc, map<posPlane, vector<pt3d>>& tangencyPoints, 
+	const double& z_planePosition, FileLogger& logger);
 
 void GetHitPointsByLines(std::vector<Detector>& detArray, const double& thresholdAngle, vector<pt3d>& hitPoints,
-	vector<pt3d>& hitPointsUncert, FileLogger& logger);
+	vector<pt3d>& hitPointsUncert, vector<pt3d>& directionVectors, FileLogger& logger);
 
 

@@ -51,5 +51,6 @@ private:
 void BufferDetectorHitsPoints(
 	const std::vector<pt3d>& hitPointsByLines,
 	const std::vector<pt3d>& hitPointsUncert,
+	const std::vector<pt3d>& directionVectors,
 	size_t counter,
 	ostream& ss);
